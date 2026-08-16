@@ -14,6 +14,7 @@ jobs:
   build-and-test:
     name: Build, test, vulnerability scan
     runs-on: windows-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -60,6 +61,7 @@ jobs:
   package-smoke-test:
     name: Installer package smoke test
     runs-on: windows-latest
+    timeout-minutes: 20
     needs: build-and-test
     steps:
       - uses: actions/checkout@v4
@@ -113,10 +115,13 @@ jobs:
           }
 
       - name: Launch installed app and verify it doesn't crash
-        # Runs non-elevated on the hosted runner: real hardware sensor access (CPU temp, PawnIO)
-        # is not available here and is not what this step verifies — it only proves the packaging/
-        # install path produced a launchable executable. Sensor-dependent behavior stays a manual
-        # pre-release check on real hardware, same as documented in CLAUDE.md.
+        # The GitHub-hosted Windows runner's default account already has admin rights and this job
+        # runs elevated, so DeviceDNA.UI.exe's requireAdministrator manifest (added to force a UAC
+        # prompt on real end-user machines) doesn't block the launch here. Real hardware sensor
+        # data (CPU temp, PawnIO) still isn't available on a CI runner regardless of elevation —
+        # not what this step verifies. It only proves the packaging/install path produced a
+        # launchable executable. Sensor-dependent behavior stays a manual pre-release check on real
+        # hardware, same as documented in CLAUDE.md.
         shell: pwsh
         run: |
           $exePath = "$env:ProgramFiles\DeviceDNA\DeviceDNA.UI.exe"
@@ -126,7 +131,17 @@ jobs:
             Write-Host "::error::App exited within 8 seconds of launch (exit code $($proc.ExitCode)) — likely a startup crash."
             exit 1
           }
-          Stop-Process -Id $proc.Id -Force
+          # PublishSingleFile self-contained exes commonly run as a launcher that spawns the real
+          # app as a CHILD process — Stop-Process on the launcher's own PID alone can leave that
+          # child alive, holding file locks the later uninstall step needs released. Kill by process
+          # name as well so no DeviceDNA.UI.exe instance survives this step under any launch shape.
+          Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+          Get-Process -Name "DeviceDNA.UI" -ErrorAction SilentlyContinue | Stop-Process -Force
+          Start-Sleep -Seconds 2
+          if (Get-Process -Name "DeviceDNA.UI" -ErrorAction SilentlyContinue) {
+            Write-Host "::error::DeviceDNA.UI process still running after Stop-Process — would block uninstall."
+            exit 1
+          }
 
       - name: Uninstall .msi silently and verify clean removal
         shell: pwsh
