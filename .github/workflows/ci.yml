@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
     name: Build, test, vulnerability scan
@@ -38,11 +42,17 @@ jobs:
         # dotnet list package --vulnerable does not exit non-zero on findings, so the job fails the
         # build itself on a match rather than relying on the command's own exit code — a known
         # vulnerable dependency should block CI, not just print a warning nobody reads.
+        #
+        # The real per-project announcement line reads "Project `X` has the following vulnerable
+        # packages" (no leading ">" — that only prefixes the per-package detail rows beneath it),
+        # vs. the clean case "...has no vulnerable packages...". An earlier version of this pattern
+        # required a leading ">" and never matched real output at all — caught by testing it against
+        # an actual vulnerable-package sample rather than trusting a single manual eyeball check.
         shell: pwsh
         run: |
           $output = dotnet list DeviceDNA.sln package --vulnerable --include-transitive 2>&1 | Out-String
           Write-Host $output
-          if ($output -match ">\s*.+\s+has the following vulnerable packages") {
+          if ($output -match "(?<!no )\bhas the following vulnerable packages\b") {
             Write-Host "::error::Vulnerable NuGet package(s) detected."
             exit 1
           }
