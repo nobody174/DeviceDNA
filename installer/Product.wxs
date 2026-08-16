@@ -11,7 +11,7 @@
   -->
   <Package Name="DeviceDNA"
            Manufacturer="DeviceDNA"
-           Version="1.0.0"
+           Version="1.0.1"
            UpgradeCode="DBB83243-2282-4E9F-A3D0-A0F69B7FDB57"
            Language="1033"
            Scope="perMachine">
