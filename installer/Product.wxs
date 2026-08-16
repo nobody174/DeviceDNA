@@ -1,0 +1,125 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+    xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+
+  <!--
+    DeviceDNA .msi installer (BACKLOG.md "No packaged installer" item, resolved via WiX per an
+    explicit user decision over the simpler Inno Setup / .exe alternative — see CHANGELOG.md).
+
+    UpgradeCode below is fixed for the lifetime of this product — never change it across versions.
+    Package Version should be bumped for every release; MajorUpgrade below handles detecting and
+    removing an older installed version automatically when a newer .msi is run.
+  -->
+  <Package Name="DeviceDNA"
+           Manufacturer="DeviceDNA"
+           Version="1.0.0"
+           UpgradeCode="DBB83243-2282-4E9F-A3D0-A0F69B7FDB57"
+           Language="1033"
+           Scope="perMachine">
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of DeviceDNA is already installed." />
+
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- Icon for the "Apps & Features" / uninstall list entry. The Start Menu shortcut below picks
+         up its icon automatically from the target exe's own embedded ApplicationIcon, so no
+         separate Icon reference is needed there. -->
+    <Icon Id="DeviceDNA.ico" SourceFile="$(var.IconFile)" />
+    <Property Id="ARPPRODUCTICON" Value="DeviceDNA.ico" />
+
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="INSTALLFOLDER" Name="DeviceDNA">
+
+        <!--
+          All files installed as one Component sharing INSTALLFOLDER's KeyPath (the exe): the
+          standard single-component pattern for an app whose files always install/uninstall
+          together as one unit, rather than a Component-per-file split (which exists mainly to let
+          MSI patch/repair individual files independently, not needed here).
+
+          The sidecar native DLLs (PublishSingleFile cannot embed them into the single exe) MUST sit
+          in this same directory as the exe, not a subfolder — .NET's native-DLL probing looks
+          alongside the launching exe at runtime. This file list mirrors the actual verified
+          `dotnet publish -c Release -r win-x64 -p:SelfContained=true -p:PublishSingleFile=true`
+          output (checked directly against the publish folder, not assumed from an older note in
+          CHANGELOG.md, which undercounted the sidecar DLLs).
+        -->
+        <Component Id="MainFiles" Guid="8F5E2C4A-9B3D-4E1F-8A6C-2D7B9E4F1A83">
+          <File Id="DeviceDNA.exe" Source="$(var.PublishDir)\DeviceDNA.UI.exe" KeyPath="yes" />
+          <File Id="e_sqlite3.dll" Source="$(var.PublishDir)\e_sqlite3.dll" />
+          <File Id="wpfgfx_cor3.dll" Source="$(var.PublishDir)\wpfgfx_cor3.dll" />
+          <File Id="PresentationNative_cor3.dll" Source="$(var.PublishDir)\PresentationNative_cor3.dll" />
+          <File Id="D3DCompiler_47_cor3.dll" Source="$(var.PublishDir)\D3DCompiler_47_cor3.dll" />
+          <File Id="PenImc_cor3.dll" Source="$(var.PublishDir)\PenImc_cor3.dll" />
+          <File Id="vcruntime140_cor3.dll" Source="$(var.PublishDir)\vcruntime140_cor3.dll" />
+          <File Id="MonoPosixHelper.dll" Source="$(var.PublishDir)\MonoPosixHelper.dll" />
+          <File Id="libMonoPosixHelper.dll" Source="$(var.PublishDir)\libMonoPosixHelper.dll" />
+        </Component>
+
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Component Id="StartMenuShortcut" Guid="3A7C1E9F-6D2B-4A85-9E3F-1C8B5A2D7E4F">
+        <Shortcut Id="DeviceDNAStartMenuShortcut"
+                  Name="DeviceDNA"
+                  Target="[INSTALLFOLDER]DeviceDNA.UI.exe"
+                  WorkingDirectory="INSTALLFOLDER" />
+        <!-- RemoveFolder + a registry KeyPath is the standard way to give a shortcut-only
+             Component something to key off for install/uninstall tracking, since it has no file
+             of its own in this directory. -->
+        <RemoveFolder Id="RemoveProgramMenuFolder" On="uninstall" />
+        <RegistryValue Root="HKCU"
+                        Key="Software\DeviceDNA"
+                        Name="StartMenuShortcutInstalled"
+                        Type="integer"
+                        Value="1"
+                        KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+
+    <Feature Id="MainFeature" Title="DeviceDNA" Level="1">
+      <ComponentRef Id="MainFiles" />
+      <ComponentRef Id="StartMenuShortcut" />
+    </Feature>
+
+    <!--
+      Bundles and silently installs PawnIO (namazso/PawnIO, GPLv2 with an explicit exception
+      permitting communication via its IOCTL interface without the calling app becoming GPL —
+      see installer/vendor/PAWNIO-NOTICE.md) — the signed kernel driver LibreHardwareMonitorLib
+      depends on for AMD SMU sensor access (CPU package temperature, live per-core clock speed).
+
+      Root cause confirmed on real hardware (2026-08-15, Ryzen 7 5800X): without PawnIO's driver
+      actually present, these specific sensors silently return a literal 0 instead of throwing or
+      being omitted — LHM's own bundled auto-installer for PawnIO does not reliably fire. Installing
+      PawnIO's official v2.2.0 installer manually confirmed the fix: CPU temp/clock read correctly
+      immediately afterward, with zero DeviceDNA code changes. This bundles that same official,
+      Authenticode-signed installer so end users get a working scan without any manual step.
+
+      Uses a deferred CustomAction (not immediate) since it launches an external signed installer —
+      deferred actions run in the elevated install sequence, matching how the main install already
+      requires admin rights for Program Files. "-install -silent" is PawnIO_setup.exe's real silent
+      flag — its own custom argument parser (verb+modifier style, not the WiX-Burn-style /quiet
+      first assumed and confirmed wrong via a live test: /quiet returned Win32 error 87/
+      ERROR_INVALID_PARAMETER; /S, the NSIS convention, silently did nothing). "-install -silent"
+      confirmed via two independent sources referencing this exact installer version (a
+      LibreHardwareMonitor community discussion and a packaging-notes site), consistent with
+      "-uninstall" already confirmed working live on this dev machine for the same installer.
+    -->
+    <Binary Id="PawnIoSetup" SourceFile="vendor\PawnIO_setup.exe" />
+    <CustomAction Id="InstallPawnIo"
+                  BinaryRef="PawnIoSetup"
+                  ExeCommand="-install -silent"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Return="ignore" />
+    <!-- Return="ignore": if PawnIO's installer fails for any reason (e.g. already installed, or a
+         future PawnIO release changes its silent-install behavior), that must not block or roll
+         back DeviceDNA's own install — CPU temp/clock would just stay "Unknown" on that machine,
+         same honest degraded behavior as before this fix existed, rather than losing the whole app. -->
+    <InstallExecuteSequence>
+      <Custom Action="InstallPawnIo" After="InstallFiles" Condition="NOT Installed" />
+    </InstallExecuteSequence>
+
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+
+  </Package>
+</Wix>

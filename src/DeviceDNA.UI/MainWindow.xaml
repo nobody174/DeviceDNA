@@ -1,0 +1,73 @@
+<Window x:Class="DeviceDNA.UI.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:DeviceDNA.UI"
+        xmlns:presentation="clr-namespace:DeviceDNA.UI.Presentation"
+        mc:Ignorable="d"
+        Title="DeviceDNA" Height="800" Width="1200"
+        Background="{StaticResource BackgroundBrush}"
+        WindowStartupLocation="CenterScreen">
+
+    <DockPanel>
+
+        <!-- Top bar: logo, wordmark, overall device health. Stays visible across both the Dashboard
+             and Diagnose pages — only the content below swaps, so navigating into Diagnose never
+             feels like leaving the app (user feedback: a separate popup Window broke that feeling). -->
+        <Border DockPanel.Dock="Top" Background="{StaticResource TopBarBrush}" Padding="20,12" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Orientation="Horizontal" Grid.Column="0" VerticalAlignment="Center">
+                    <!-- The square icon glyph, not the wide Logo.png wordmark — that PNG is a
+                         non-square rectangle with "DeviceDNA" text baked in; squeezing it into a
+                         small square box (the previous 40x40 Image) distorted it into an illegible
+                         sliver. At this larger size the icon reads clearly on its own, so the
+                         separate "Device"+"DNA" text labels next to it were removed as redundant
+                         (user feedback). -->
+                    <Image Source="../../../assets/icon.ico" Height="96" Width="96"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Hostname}" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,16,0"/>
+                    <Ellipse Width="14" Height="14" Fill="{Binding OverallStatusBrushKey, Converter={StaticResource HealthStatusToBrushConverter}}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,16,0"/>
+                    <Button Content="{Binding IsScanning, Converter={StaticResource RescanLabelConverter}}"
+                            Command="{Binding RescanCommand}" Margin="0,0,8,0"/>
+                    <Button Content="History" Command="{Binding OpenHistoryCommand}" Margin="0,0,8,0"/>
+                    <Button Content="Diagnose" Command="{Binding OpenDiagnoseCommand}" Margin="0,0,8,0"/>
+                    <Button Content="Export" Command="{Binding ExportCommand}"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Content area: the orbital DNA Dashboard (BACKLOG.md "DNA-helix / orbital visual
+             redesign"), Diagnose, or History & Changes — whichever is active. Dashboard shows
+             whenever neither Diagnose nor History is active. -->
+        <Grid>
+            <local:DashboardView>
+                <local:DashboardView.Style>
+                    <Style TargetType="local:DashboardView">
+                        <Setter Property="Visibility" Value="Visible"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsDiagnoseActive}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsHistoryActive}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </local:DashboardView.Style>
+            </local:DashboardView>
+            <local:DiagnoseView Visibility="{Binding IsDiagnoseActive, Converter={StaticResource BoolToVisibilityConverter}}"/>
+            <local:HistoryView Visibility="{Binding IsHistoryActive, Converter={StaticResource BoolToVisibilityConverter}}"/>
+        </Grid>
+
+    </DockPanel>
+</Window>

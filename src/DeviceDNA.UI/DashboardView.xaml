@@ -1,0 +1,322 @@
+<UserControl x:Class="DeviceDNA.UI.DashboardView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:DeviceDNA.UI"
+             xmlns:presentation="clr-namespace:DeviceDNA.UI.Presentation"
+             mc:Ignorable="d">
+
+    <UserControl.Resources>
+        <!-- Field cards: sized/spaced to match the approved HTML mockup's .field-card (9px label /
+             13px value, panel-colored background, 6px radius), then shrunk one notch further per
+             user feedback (2026-08-16: "boxes a bit smaller, font down 1-2pt"). -->
+        <DataTemplate x:Key="DetailFieldRowTemplate" DataType="{x:Type presentation:FieldRow}">
+            <Border Background="{StaticResource TopBarBrush}" BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="1" CornerRadius="6" Padding="9,6" Margin="4" ToolTip="{Binding Tooltip}">
+                <StackPanel>
+                    <TextBlock Text="{Binding Label}" FontSize="8" Foreground="{StaticResource TextSecondaryBrush}"/>
+                    <TextBlock Text="{Binding Value}" FontSize="12" FontWeight="SemiBold" Margin="0,2,0,0"/>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <!--
+        Orbital DNA view (BACKLOG.md "DNA-helix / orbital visual redesign", 2026-08-15): replaces the
+        former command-deck tile grid. A central "This Computer" hub with one orbit node per DNA
+        component, positioned on a circle computed in DashboardView.xaml.cs (WPF has no built-in
+        "arrange in a circle" panel). Clicking a node shows all its fields at once (no Basic/Advanced
+        split — design decision) in the detail panel below, replacing the orbit view. Stage 3: the
+        show/hide swap itself has no animation yet (added in Stage 4).
+    -->
+    <Grid Background="{StaticResource BackgroundBrush}">
+        <!-- Orbit overview and detail panel both stay in the visual tree at all times (never
+             Visibility=Collapsed) so DashboardView.xaml.cs can animate the swap between them —
+             Collapsed elements can't be mid-fade. IsHitTestVisible is toggled instead, so the
+             collapsed/faded-out one doesn't intercept clicks. RenderTransformOrigin centers the
+             scale-down so the orbit shrinks toward its own middle, not the window's top-left. -->
+        <Canvas x:Name="OrbitCanvas" ClipToBounds="False" RenderTransformOrigin="0.5,0.5">
+            <Canvas.RenderTransform>
+                <TransformGroup>
+                    <ScaleTransform x:Name="OrbitScaleTransform" ScaleX="1" ScaleY="1"/>
+                    <TranslateTransform x:Name="OrbitTranslateTransform" X="0" Y="0"/>
+                </TransformGroup>
+            </Canvas.RenderTransform>
+
+            <!-- Strand connectors from each node to the hub, drawn first so they sit behind the
+                 hub/nodes. Curved (not straight spokes) as a restrained nod to a DNA helix's
+                 cross-tie look, single consistent teal color for every connector (not alternating
+                 gold/teal — an earlier version did, but a two-tone scheme risked reading as a status
+                 signal to users, which it never was; see DashboardView.xaml.cs's LayoutOrbit, which
+                 draws every strand with the same StrandAccentBrush) — paths generated in
+                 DashboardView.xaml.cs since their curve control points depend on the same computed
+                 node coordinates as the layout itself. -->
+            <Canvas x:Name="StrandCanvas"/>
+
+            <!-- Hub: "This Computer" -->
+            <Border x:Name="HubBorder" Width="152" Height="152" CornerRadius="76"
+                    Background="{StaticResource TileBackgroundBrush}"
+                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <TextBlock Text="THIS COMPUTER" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}"
+                               HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                    <TextBlock Text="{Binding Hostname}" FontSize="15" FontWeight="SemiBold"
+                               HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Width="120"/>
+                    <TextBlock Text="{Binding StatusMessage}" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}"
+                               HorizontalAlignment="Center" Margin="0,6,0,0" TextAlignment="Center" TextWrapping="Wrap" Width="120"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Orbit nodes, one per DNA component. Positioned in DashboardView.xaml.cs (Canvas.Left/
+                 Top set on each generated container) rather than bound from the ViewModel — pixel
+                 layout is a view concern, not something DnaTileViewModel should know about. -->
+            <ItemsControl x:Name="OrbitNodesControl" ItemsSource="{Binding Tiles}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <Canvas/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemContainerStyle>
+                    <!-- Container size is set imperatively in DashboardView.xaml.cs (LayoutOrbit) so
+                         nodes can shrink together as component count grows; HorizontalContentAlignment/
+                         VerticalContentAlignment="Stretch" makes the Border below fill that size
+                         instead of centering at its own fixed size within it. -->
+                    <Style TargetType="ContentPresenter">
+                        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                        <Setter Property="VerticalAlignment" Value="Stretch"/>
+                    </Style>
+                </ItemsControl.ItemContainerStyle>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type presentation:DnaTileViewModel}">
+                        <Border CornerRadius="9999"
+                                Background="{StaticResource TileBackgroundBrush}"
+                                BorderBrush="{Binding StatusBrushKey, Converter={StaticResource HealthStatusToBrushConverter}}"
+                                BorderThickness="2"
+                                Cursor="Hand"
+                                MouseLeftButtonDown="OrbitNode_MouseLeftButtonDown">
+                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                <!-- Real per-category icon (user feedback, 2026-08-16: wifi for
+                                     network, gpu card, cpu-with-pins, old-style harddrive, real
+                                     motherboard layout, windows logo, two ram sticks) instead of a
+                                     plain text label — see App.xaml's IconGeometry.* resources.
+                                     Stroke-based for 6 of 7 types; the OS icon is fill-based (solid
+                                     Windows-logo quadrants), switched via DnaTypeIsOsConverter. -->
+                                <Path Data="{Binding Type, Converter={StaticResource DnaTypeToIconGeometryConverter}}"
+                                      Width="26" Height="26" Stretch="Uniform"
+                                      HorizontalAlignment="Center" Margin="0,0,0,6">
+                                    <Path.Style>
+                                        <Style TargetType="Path">
+                                            <Setter Property="Stroke" Value="{StaticResource TextPrimaryBrush}"/>
+                                            <Setter Property="StrokeThickness" Value="1.4"/>
+                                            <Setter Property="StrokeStartLineCap" Value="Round"/>
+                                            <Setter Property="StrokeEndLineCap" Value="Round"/>
+                                            <Setter Property="Fill" Value="Transparent"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Type, Converter={StaticResource DnaTypeIsOsConverter}}" Value="True">
+                                                    <Setter Property="Fill" Value="{StaticResource TextPrimaryBrush}"/>
+                                                    <Setter Property="Stroke" Value="{x:Null}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Path.Style>
+                                </Path>
+                                <TextBlock Text="{Binding TypeLabel}" FontSize="12" FontWeight="SemiBold"
+                                           HorizontalAlignment="Center"/>
+                                <TextBlock Text="{Binding Name}" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}"
+                                           HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
+                                           Width="88" Margin="0,4,0,0" MaxHeight="26" TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+        </Canvas>
+
+        <!-- Detail panel: shown in place of the orbit view when a node is selected. All fields at
+             once (Basic + Advanced, in two labeled sections), no tier toggle — design decision: a
+             fully-expanded component gets full-screen space, so there's no need to hide "Advanced"
+             behind a toggle the way the old tile grid did. Left column: the animated DNA helix
+             (HelixVisual). Right column: the actual detail content — user feedback, 2026-08-16:
+             "helix big on the left, entire info attached to the right side instead of the left." -->
+        <!-- Opaque Background is essential here: without it this Grid is transparent everywhere
+             except where child controls explicitly paint, letting the orbit view behind it show
+             through the gaps — confirmed as the actual root cause of "the main page gets stuck
+             behind the detail window, looks messy" (2026-08-16), not a failure of the animation
+             itself. Both panels always sit in the tree (see OrbitCanvas's comment) so this
+             background is what actually makes the swap read as a real page change. -->
+        <Grid x:Name="DetailPanel" Background="{StaticResource BackgroundBrush}" Opacity="0" IsHitTestVisible="False">
+            <Grid.RenderTransform>
+                <TranslateTransform x:Name="DetailTranslateTransform" X="24" Y="0"/>
+            </Grid.RenderTransform>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="220"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <local:HelixVisual Grid.Column="0" Margin="24,0,0,0"/>
+
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Row="0" Margin="40,28,40,16">
+                <Button Content="&#x2190; Back to overview" Click="BackToOverview_Click"
+                        HorizontalAlignment="Left" Margin="0,0,0,16"/>
+                <StackPanel Orientation="Horizontal">
+                    <Border Width="42" Height="42" CornerRadius="21"
+                            Background="{StaticResource TileBackgroundBrush}"
+                            BorderBrush="{Binding SelectedTile.StatusBrushKey, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource HealthStatusToBrushConverter}}"
+                            BorderThickness="2" Margin="0,0,12,0">
+                        <Path Data="{Binding SelectedTile.Type, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource DnaTypeToIconGeometryConverter}}"
+                              Width="20" Height="20" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Path.Style>
+                                <Style TargetType="Path">
+                                    <Setter Property="Stroke" Value="{StaticResource TextPrimaryBrush}"/>
+                                    <Setter Property="StrokeThickness" Value="1.4"/>
+                                    <Setter Property="StrokeStartLineCap" Value="Round"/>
+                                    <Setter Property="StrokeEndLineCap" Value="Round"/>
+                                    <Setter Property="Fill" Value="Transparent"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SelectedTile.Type, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource DnaTypeIsOsConverter}}" Value="True">
+                                            <Setter Property="Fill" Value="{StaticResource TextPrimaryBrush}"/>
+                                            <Setter Property="Stroke" Value="{x:Null}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Path.Style>
+                        </Path>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <!-- Clickable vendor-link name, re-added after being dropped when the
+                             detail view was rebuilt for the orbital redesign (regression, user
+                             feedback 2026-08-16: "the link by pressing the name... isn't there
+                             anymore"). Reuses SelectedTile.OpenVendorUrlCommand — the same command
+                             MainViewModel already bubbles up to MainWindow.xaml.cs's OpenVendorUrl,
+                             so no new wiring is needed beyond binding it here. -->
+                        <TextBlock Text="{Binding SelectedTile.Name, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                   FontSize="19" FontWeight="SemiBold"
+                                   Cursor="{Binding SelectedTile.HasVendorUrl, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToCursorConverter}}"
+                                   ToolTip="{Binding SelectedTile.VendorUrl, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                   MouseLeftButtonDown="DetailNameText_MouseLeftButtonDown">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SelectedTile.HasVendorUrl, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
+                                            <Setter Property="TextDecorations" Value="Underline"/>
+                                            <Setter Property="Foreground" Value="{StaticResource GoldBrush}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <!-- Explicit status dot, re-added alongside the TypeLabel subtitle — the
+                             icon border already picks up the status color, but that alone didn't
+                             read as "the status light" to the user the way the old command-deck
+                             tile grid's dedicated dot did (user feedback, 2026-08-16: "the green
+                             light on each component is gone... isn't any inside the orbit in the
+                             detailed view"). -->
+                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                            <Ellipse Width="9" Height="9" VerticalAlignment="Center" Margin="0,0,6,0"
+                                     Fill="{Binding SelectedTile.StatusBrushKey, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource HealthStatusToBrushConverter}}"/>
+                            <TextBlock Text="{Binding SelectedTile.TypeLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                       FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                        </StackPanel>
+                        <!-- Network-only: connection type / WiFi signal shown prominently in the
+                             header rather than buried in the field grid (user feedback,
+                             2026-08-16). See DnaTileViewModel.NetworkSubtitle — null (so this row
+                             collapses) for every non-Network DNA. -->
+                        <TextBlock Text="{Binding SelectedTile.NetworkSubtitle, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                   FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource StrandAccentBrush}"
+                                   Margin="0,4,0,0"
+                                   Visibility="{Binding SelectedTile.NetworkSubtitle, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource StringToVisibilityConverter}}"/>
+                    </StackPanel>
+                    <!-- CPU-only: link to the CPU-Z Validator community benchmark database, sorted
+                         by highest recorded frequency for this exact model (user-found, personally
+                         verified, and the URL's "psn" parameter confirmed decodable as plain
+                         ASCII-hex of the CPU name — see CpuBasic.BenchmarkUrl). Null/collapsed for
+                         every other DNA type. -->
+                    <Button Content="View Benchmark &#x2197;" Command="{Binding SelectedTile.OpenBenchmarkUrlCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            VerticalAlignment="Center" Margin="16,0,0,0"
+                            Visibility="{Binding SelectedTile.HasBenchmarkUrl, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                </StackPanel>
+            </StackPanel>
+
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="40,0,40,32">
+                <StackPanel>
+                    <!-- Status banner, matching the mockup's — a left-accent-bordered strip using
+                         the DNA's real status/summary, not a placeholder. -->
+                    <Border Background="{StaticResource TopBarBrush}" BorderBrush="{StaticResource BorderBrush}"
+                            BorderThickness="1,1,1,1" CornerRadius="6" Padding="12,8" Margin="0,0,0,14">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="BorderThickness" Value="1"/>
+                            </Style>
+                        </Border.Style>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="4"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Rectangle Grid.Column="0" Margin="-12,-8,10,-8"
+                                       Fill="{Binding SelectedTile.StatusBrushKey, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource HealthStatusToBrushConverter}}"/>
+                            <TextBlock Grid.Column="1" Text="{Binding SelectedTile.Summary, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                       FontSize="12" TextWrapping="Wrap"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Opt-in Windows Update driver check (REQUIREMENTS.md section 10, clarified
+                         2026-08-15: strictly user-triggered, never automatic). Offered only for the
+                         DNA types SupportsWindowsUpdateCheck allows (CPU/GPU/Network/Motherboard) —
+                         collapsed for the rest via the button's own Visibility binding. Result text
+                         is null until a check has actually run for this tile, so nothing shows
+                         beforehand implying a check already happened. -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,14"
+                                Visibility="{Binding SelectedTile.SupportsWindowsUpdateCheck, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Button Content="{Binding SelectedTile.IsCheckingWindowsUpdate, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource CheckingLabelConverter}}"
+                                Command="{Binding SelectedTile.CheckWindowsUpdateCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding SelectedTile.WindowsUpdateResultText, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                   FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap" MaxWidth="480" VerticalAlignment="Center" Margin="12,0,0,0"
+                                   Visibility="{Binding SelectedTile.WindowsUpdateResultText, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource StringToVisibilityConverter}}"/>
+                    </StackPanel>
+
+                    <TextBlock Text="OVERVIEW" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource GoldBrush}"
+                               Margin="0,0,0,8"/>
+                    <ItemsControl ItemsSource="{Binding SelectedTile.BasicFields, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                  ItemTemplate="{StaticResource DetailFieldRowTemplate}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <!-- Fixed 3 columns always (user requirement, 2026-08-16), not
+                                     width-based wrapping — UniformGrid guarantees exactly 3 per row
+                                     regardless of field count, wrapping to as many rows as needed. -->
+                                <UniformGrid Columns="3"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+
+                    <TextBlock Text="ADVANCED" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource GoldBrush}"
+                               Margin="0,16,0,8"
+                               Visibility="{Binding SelectedTile.HasAdvancedFields, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                    <ItemsControl ItemsSource="{Binding SelectedTile.AdvancedFields, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                  ItemTemplate="{StaticResource DetailFieldRowTemplate}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <!-- Fixed 3 columns always (user requirement, 2026-08-16), not
+                                     width-based wrapping — UniformGrid guarantees exactly 3 per row
+                                     regardless of field count, wrapping to as many rows as needed. -->
+                                <UniformGrid Columns="3"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+        </Grid>
+
+    </Grid>
+</UserControl>

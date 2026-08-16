@@ -1,0 +1,62 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{86659557-4BE0-46F8-A241-15EFCAF4C828}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DeviceDNA.Model", "src\DeviceDNA.Model\DeviceDNA.Model.csproj", "{E44CB507-36BC-4717-8529-D4ACFE946FAB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DeviceDNA.PlatformAdapters", "src\DeviceDNA.PlatformAdapters\DeviceDNA.PlatformAdapters.csproj", "{D45957DF-7C8B-4826-B7F3-64ACE0E3C04F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DeviceDNA.DetectionEngine", "src\DeviceDNA.DetectionEngine\DeviceDNA.DetectionEngine.csproj", "{A18B18F5-838B-4CDE-BEFF-C52F74586A6E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DeviceDNA.Application", "src\DeviceDNA.Application\DeviceDNA.Application.csproj", "{37F1C14E-E2CE-420D-B229-8DDF47064C6F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DeviceDNA.UI", "src\DeviceDNA.UI\DeviceDNA.UI.csproj", "{19CDF38B-4DC3-4CFF-AE21-D6B1773DE5FB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DeviceDNA.Tests", "src\DeviceDNA.Tests\DeviceDNA.Tests.csproj", "{874610FA-B58E-40A8-95CE-5FD1B1ED1F88}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E44CB507-36BC-4717-8529-D4ACFE946FAB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E44CB507-36BC-4717-8529-D4ACFE946FAB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E44CB507-36BC-4717-8529-D4ACFE946FAB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E44CB507-36BC-4717-8529-D4ACFE946FAB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D45957DF-7C8B-4826-B7F3-64ACE0E3C04F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D45957DF-7C8B-4826-B7F3-64ACE0E3C04F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D45957DF-7C8B-4826-B7F3-64ACE0E3C04F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D45957DF-7C8B-4826-B7F3-64ACE0E3C04F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A18B18F5-838B-4CDE-BEFF-C52F74586A6E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A18B18F5-838B-4CDE-BEFF-C52F74586A6E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A18B18F5-838B-4CDE-BEFF-C52F74586A6E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A18B18F5-838B-4CDE-BEFF-C52F74586A6E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{37F1C14E-E2CE-420D-B229-8DDF47064C6F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{37F1C14E-E2CE-420D-B229-8DDF47064C6F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{37F1C14E-E2CE-420D-B229-8DDF47064C6F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{37F1C14E-E2CE-420D-B229-8DDF47064C6F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{19CDF38B-4DC3-4CFF-AE21-D6B1773DE5FB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{19CDF38B-4DC3-4CFF-AE21-D6B1773DE5FB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{19CDF38B-4DC3-4CFF-AE21-D6B1773DE5FB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{19CDF38B-4DC3-4CFF-AE21-D6B1773DE5FB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{874610FA-B58E-40A8-95CE-5FD1B1ED1F88}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{874610FA-B58E-40A8-95CE-5FD1B1ED1F88}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{874610FA-B58E-40A8-95CE-5FD1B1ED1F88}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{874610FA-B58E-40A8-95CE-5FD1B1ED1F88}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{E44CB507-36BC-4717-8529-D4ACFE946FAB} = {86659557-4BE0-46F8-A241-15EFCAF4C828}
+		{D45957DF-7C8B-4826-B7F3-64ACE0E3C04F} = {86659557-4BE0-46F8-A241-15EFCAF4C828}
+		{A18B18F5-838B-4CDE-BEFF-C52F74586A6E} = {86659557-4BE0-46F8-A241-15EFCAF4C828}
+		{37F1C14E-E2CE-420D-B229-8DDF47064C6F} = {86659557-4BE0-46F8-A241-15EFCAF4C828}
+		{19CDF38B-4DC3-4CFF-AE21-D6B1773DE5FB} = {86659557-4BE0-46F8-A241-15EFCAF4C828}
+		{874610FA-B58E-40A8-95CE-5FD1B1ED1F88} = {86659557-4BE0-46F8-A241-15EFCAF4C828}
+	EndGlobalSection
+EndGlobal

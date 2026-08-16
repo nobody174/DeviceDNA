@@ -1,0 +1,99 @@
+<UserControl x:Class="DeviceDNA.UI.DiagnoseView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:presentation="clr-namespace:DeviceDNA.UI.Presentation"
+             mc:Ignorable="d">
+
+    <UserControl.Resources>
+        <DataTemplate x:Key="FindingTemplate" DataType="{x:Type presentation:DiagnoseFindingViewModel}">
+            <Border Background="{StaticResource TileBackgroundBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    Margin="0,0,0,8"
+                    Padding="14">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" Width="28" Height="28" CornerRadius="14" VerticalAlignment="Top" Margin="0,0,12,0"
+                            Background="{Binding StatusBrushKey, Converter={StaticResource HealthStatusToBrushConverter}}">
+                        <TextBlock Text="{Binding Glyph}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   FontSize="14" FontWeight="Bold" Foreground="#FF14161A"/>
+                    </Border>
+
+                    <StackPanel Grid.Column="1">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}">
+                                <Run Text="{Binding DnaTypeLabel, Mode=OneWay}"/>
+                                <Run Text=" · "/>
+                                <Run Text="{Binding DnaName, Mode=OneWay}"/>
+                            </TextBlock>
+                            <TextBlock Grid.Column="1" Text="{Binding SeverityLabel}" FontSize="11"
+                                       Foreground="{StaticResource TextSecondaryBrush}"/>
+                        </Grid>
+
+                        <TextBlock Text="{Binding Message}" TextWrapping="Wrap" Margin="0,4,0,0" FontSize="13"/>
+
+                        <TextBlock Text="{Binding Suggestion}" TextWrapping="Wrap" Margin="0,4,0,0" FontSize="12"
+                                   Foreground="{StaticResource TextSecondaryBrush}" FontStyle="Italic"
+                                   Visibility="{Binding Suggestion, Converter={StaticResource StringToVisibilityConverter}}"/>
+
+                        <TextBlock Margin="0,4,0,0" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}">
+                            <Run Text="Confidence: "/>
+                            <Run Text="{Binding ConfidenceLabel, Mode=OneWay}"/>
+                        </TextBlock>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="GroupTemplate" DataType="{x:Type presentation:DiagnoseGroupViewModel}">
+            <StackPanel Margin="0,0,0,20">
+                <TextBlock Text="{Binding GroupLabel}" FontSize="16" FontWeight="SemiBold"
+                           Foreground="{StaticResource GoldBrush}" Margin="0,0,0,10"/>
+                <ItemsControl ItemsSource="{Binding Findings}" ItemTemplate="{StaticResource FindingTemplate}"/>
+            </StackPanel>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <DockPanel>
+
+        <!-- Diagnose's own sub-header: back navigation + summary. The app-level top bar (logo,
+             Rescan/History/Export) stays visible above this via MainWindow — only the main content
+             area swaps between DashboardView and this view. -->
+        <Border DockPanel.Dock="Top" Background="{StaticResource TopBarBrush}" Padding="20,12"
+                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="0" Content="← Back to Dashboard"
+                        Command="{Binding GoBackToDashboardCommand}"
+                        Padding="12,5" FontSize="12" Margin="0,0,16,0"
+                        Foreground="{StaticResource TextPrimaryBrush}"
+                        Background="{StaticResource TileBackgroundHoverBrush}"
+                        BorderBrush="{StaticResource GoldBrush}" BorderThickness="1"/>
+                <TextBlock Grid.Column="1" Text="Diagnose" FontSize="22" FontWeight="SemiBold"
+                           Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="2" Text="{Binding DiagnoseViewModel.SummaryText}" HorizontalAlignment="Right"
+                           VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}"/>
+            </Grid>
+        </Border>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding DiagnoseViewModel.Groups}" ItemTemplate="{StaticResource GroupTemplate}" Margin="20"/>
+        </ScrollViewer>
+
+    </DockPanel>
+</UserControl>

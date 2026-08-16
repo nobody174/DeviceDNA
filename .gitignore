@@ -1,0 +1,27 @@
+# .NET build output
+bin/
+obj/
+publish/
+
+# WiX installer build output
+installer/bin/
+installer/obj/
+
+# Visual Studio / Rider / VS Code
+.vs/
+.idea/
+*.user
+*.suo
+
+# Local scan history database (never commit real scan/user data)
+*.db
+*.db-shm
+*.db-wal
+
+# Crash dumps, logs
+*.log
+*.dmp
+
+# OS noise
+.DS_Store
+Thumbs.db

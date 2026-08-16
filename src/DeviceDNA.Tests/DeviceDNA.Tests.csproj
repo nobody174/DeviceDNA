@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="xunit" Version="2.5.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
+
+    <!-- Direct pins overriding vulnerable transitive versions pulled in by System.Management's
+         netstandard2.0 compat shims (GHSA-7jgj-8wvc-jh57, GHSA-cmhx-cq75-c4mj) — caught by CI's
+         NuGet vulnerability scan. Neither old assembly actually loads on net8.0, but pinning the
+         patched version outright is more robust than relying on that being true forever. -->
+    <PackageReference Include="System.Net.Http" Version="4.3.4" />
+    <PackageReference Include="System.Text.RegularExpressions" Version="4.3.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DeviceDNA.Model\DeviceDNA.Model.csproj" />
+    <ProjectReference Include="..\DeviceDNA.DetectionEngine\DeviceDNA.DetectionEngine.csproj" />
+    <ProjectReference Include="..\DeviceDNA.Application\DeviceDNA.Application.csproj" />
+  </ItemGroup>
+
+</Project>

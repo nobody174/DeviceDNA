@@ -1,0 +1,447 @@
+<title>DeviceDNA Orbital View</title>
+<style>
+  :root {
+    --bg: #14161a;
+    --panel: #1b1e24;
+    --node: #20232a;
+    --node-hover: #272b33;
+    --border: #32363f;
+    --text: #f2f2f2;
+    --text-dim: #a0a5ad;
+    --gold: #d4af5a;
+    --strand: #5ca8b8;
+    --green: #3fb86f;
+    --yellow: #e0b93c;
+    --red: #e05c4c;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", -apple-system, sans-serif;
+    overflow: hidden;
+    height: 100%;
+  }
+
+  body { display: flex; flex-direction: column; }
+
+  /* ---------- Top bar (mirrors the real app's fixed top bar) ---------- */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--gold), var(--strand));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--bg);
+    letter-spacing: -0.5px;
+  }
+  .topbar-actions { display: flex; align-items: center; gap: 10px; }
+  .status-line { display: flex; align-items: center; gap: 8px; color: var(--text-dim); font-size: 13px; margin-right: 8px; }
+  .status-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); }
+  .btn {
+    padding: 7px 14px;
+    font-size: 12px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--node-hover);
+    color: var(--text);
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .btn:hover { border-color: var(--gold); }
+  .btn.ghost { background: transparent; }
+
+  /* ---------- Stage ---------- */
+  .stage {
+    position: relative;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* Hub + orbit ring, centered by default */
+  .constellation {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.65s cubic-bezier(0.65, 0, 0.35, 1), opacity 0.5s ease;
+    transform-origin: 130px 130px;
+  }
+
+  .orbit-wrap {
+    position: relative;
+    width: 560px;
+    height: 560px;
+  }
+
+  .hub {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 152px;
+    height: 152px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #262a32, var(--node) 70%);
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    box-shadow: 0 0 0 1px rgba(212,175,90,0.08), 0 20px 60px -20px rgba(0,0,0,0.6);
+    z-index: 3;
+  }
+  .hub-label { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-dim); }
+  .hub-name { font-size: 15px; font-weight: 600; margin-top: 4px; }
+  .hub-health { font-size: 11px; color: var(--green); margin-top: 6px; display: flex; align-items: center; gap: 5px; }
+  .hub-health::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+
+  /* strand connectors, drawn with an SVG so they can curve like a helix cross-tie */
+  svg.strands { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
+  .strand-path {
+    fill: none;
+    stroke-width: 1.4;
+    opacity: 0.55;
+  }
+
+  .node {
+    position: absolute;
+    width: 108px;
+    height: 108px;
+    margin-left: -54px;
+    margin-top: -54px;
+    border-radius: 50%;
+    background: var(--node);
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    cursor: pointer;
+    z-index: 2;
+    transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .node:hover {
+    background: var(--node-hover);
+    transform: scale(1.06);
+    box-shadow: 0 0 0 1px var(--ring, var(--gold)), 0 12px 30px -12px rgba(0,0,0,0.7);
+  }
+  .node-ring {
+    position: absolute;
+    inset: -1px;
+    border-radius: 50%;
+    border: 2px solid var(--ring, var(--green));
+    opacity: 0.85;
+  }
+  .node-glyph { width: 26px; height: 26px; margin-bottom: 6px; opacity: 0.92; color: var(--text); }
+  .node-label { font-size: 12px; font-weight: 600; }
+  .node-sub { font-size: 10px; color: var(--text-dim); margin-top: 2px; }
+
+  /* ---------- Expanded state ---------- */
+  .constellation.collapsed {
+    transform: translate(-38vw, -32vh) scale(0.34);
+    opacity: 0.9;
+  }
+  .constellation.collapsed .hub-health,
+  .constellation.collapsed .node-sub { display: none; }
+  .constellation.collapsed .node:hover { transform: none; }
+
+  .mini-label {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0;
+    transition: opacity 0.4s ease 0.3s;
+    pointer-events: none;
+  }
+  .stage.expanded .mini-label { opacity: 1; }
+
+  .detail {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    padding: 28px 44px 28px 320px;
+    opacity: 0;
+    transform: translateX(24px);
+    pointer-events: none;
+    transition: opacity 0.45s ease 0.2s, transform 0.45s ease 0.2s;
+    overflow-y: auto;
+  }
+  .stage.expanded .detail {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+  }
+
+  .detail-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .detail-icon {
+    width: 42px; height: 42px; border-radius: 50%;
+    background: var(--node); border: 2px solid var(--ring, var(--green));
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .detail-icon svg { width: 22px; height: 22px; }
+  .detail-title { font-size: 19px; font-weight: 600; }
+  .detail-sub { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-dim);
+    font-size: 12px;
+    cursor: pointer;
+    margin-bottom: 20px;
+    background: none;
+    border: none;
+    font-family: inherit;
+    padding: 0;
+  }
+  .back-link:hover { color: var(--gold); }
+
+  .field-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 8px;
+  }
+  .field-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 9px 12px;
+  }
+  .field-card-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-dim); }
+  .field-card-value { font-size: 13px; font-weight: 600; margin-top: 3px; font-variant-numeric: tabular-nums; }
+
+  .field-section-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--gold);
+    margin: 16px 0 8px;
+  }
+  .field-section-title:first-of-type { margin-top: 2px; }
+
+  .status-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--ring, var(--green));
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 12px;
+    margin-bottom: 14px;
+  }
+
+  ::-webkit-scrollbar { width: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+</style>
+
+<body>
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-icon">DD</div>
+    </div>
+    <div class="topbar-actions">
+      <span class="status-line"><span class="status-dot"></span>7 DNA components detected.</span>
+      <button class="btn">Rescan</button>
+      <button class="btn ghost">History</button>
+      <button class="btn ghost">Diagnose</button>
+      <button class="btn">Export</button>
+    </div>
+  </div>
+
+  <div class="stage" id="stage">
+    <div class="mini-label">Overview</div>
+
+    <div class="constellation" id="constellation">
+      <div class="orbit-wrap" id="orbitWrap">
+        <svg class="strands" viewBox="0 0 560 560" id="strandsSvg"></svg>
+
+        <div class="hub">
+          <div class="hub-label">This Computer</div>
+          <div class="hub-name" id="hubName">BASEMENT&nbsp;PC</div>
+          <div class="hub-health">All systems normal</div>
+        </div>
+
+        <div id="nodes"></div>
+      </div>
+    </div>
+
+    <div class="detail" id="detail"></div>
+  </div>
+
+  <script>
+    // Real, recognizable per-category icons (inline SVG, currentColor strokes) instead of abstract
+    // glyphs — user feedback: "wifi icon for network, gpu card drawing, cpu block with pins,
+    // old-style harddrive for storage, motherboard with real layout not just a square, windows
+    // logo for OS, two ram sticks side by side for memory."
+    const ICONS = {
+      cpu: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="7" y="7" width="10" height="10" rx="1"/><rect x="10" y="10" width="4" height="4"/><path d="M9 2v3M12 2v3M15 2v3M9 19v3M12 19v3M15 19v3M2 9h3M2 12h3M2 15h3M19 9h3M19 12h3M19 15h3"/></svg>`,
+      gpu: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="11" rx="1.5"/><circle cx="7" cy="11.5" r="2.4"/><circle cx="13" cy="11.5" r="2.4"/><path d="M18 9v5M2 17v2a1 1 0 0 0 1 1h2M22 6V4a1 1 0 0 0-1-1h-3"/></svg>`,
+      memory: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="7.5" height="16" rx="1"/><rect x="14" y="4" width="7.5" height="16" rx="1"/><path d="M4.5 4v3M6.5 4v3M8.5 4v3M16 4v3M18 4v3M20 4v3"/></svg>`,
+      storage: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="1.5"/><circle cx="12" cy="12" r="4.2"/><circle cx="12" cy="12" r="0.8" fill="currentColor" stroke="none"/><path d="M2 16h5"/></svg>`,
+      mobo: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="2.5" width="19" height="19" rx="1.5"/><rect x="5" y="5" width="6" height="6"/><rect x="14" y="5" width="5" height="3"/><path d="M14 10.5h5M5 13.5h4M11.5 13.5v6M5 17h4M16.5 13v6.5M19 15.5h-5"/><circle cx="17.5" cy="17.5" r="1.4"/></svg>`,
+      network: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5a12 12 0 0 1 16 0"/><path d="M7 13a7.5 7.5 0 0 1 10 0"/><path d="M10 16.5a3 3 0 0 1 4 0"/><circle cx="12" cy="19.5" r="1" fill="currentColor" stroke="none"/></svg>`,
+      os: `<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M3 5.6 10.4 4.6V11.7H3V5.6ZM11.3 4.5 21 3.2V11.6H11.3V4.5ZM3 12.6H10.4V19.7L3 18.7V12.6ZM11.3 12.6H21V21L11.3 19.7V12.6Z"/></svg>`,
+    };
+
+    const components = [
+      { id: "cpu", label: "CPU", icon: "cpu", status: "green", sub: "Ryzen 7 5800X",
+        fields: {
+          "Overview": {
+            "Name": "AMD Ryzen 7 5800X", "Manufacturer": "AMD", "Cores": "8", "Threads": "16", "Base Clock": "3.8 GHz"
+          },
+          "Live Readings": {
+            "Current Temp": "48.0 °C", "Live Clock": "4.53 GHz", "Utilization": "12%", "Power Mode": "Balanced"
+          },
+          "Advanced": {
+            "Architecture": "Zen 3, Vermeer", "Socket": "AM4", "Cache L3": "32768 KB", "Virtualization": "Enabled"
+          }
+        }},
+      { id: "gpu", label: "GPU", icon: "gpu", status: "green", sub: "RTX 3060",
+        fields: {
+          "Overview": { "Name": "NVIDIA GeForce RTX 3060", "Manufacturer": "NVIDIA", "VRAM": "12 GB", "Driver": "566.03" },
+          "Live Readings": { "Current Temp": "41 °C", "Utilization": "3%", "VRAM Usage": "1.2 GB" },
+          "Advanced": { "Core Clock": "1320 MHz", "PCIe Gen": "4.0 x16", "Memory Type": "GDDR6" }
+        }},
+      { id: "memory", label: "Memory", icon: "memory", status: "yellow", sub: "16 GB DDR4",
+        fields: {
+          "Overview": { "Total Capacity": "16 GB", "Type": "DDR4", "Speed": "3200 MT/s", "Slots Used": "2 of 4" },
+          "Advanced": { "Rated Speed": "3600 MT/s", "Actual Speed": "3200 MT/s", "Channel Mode": "Dual" }
+        }},
+      { id: "storage", label: "Storage", icon: "storage", status: "green", sub: "2 disks",
+        fields: {
+          "Overview": { "Model": "KINGSTON SKC3000D2048G", "Capacity": "2048 GB", "Free Space": "61%", "Type": "NVMe" },
+          "Advanced": { "Interface": "PCIe 4.0", "SMART Health": "100%", "Current Temp": "39 °C" }
+        }},
+      { id: "mobo", label: "Motherboard", icon: "mobo", status: "green", sub: "B550-PRO",
+        fields: {
+          "Overview": { "Manufacturer": "ASUSTeK COMPUTER INC.", "Model": "TUF GAMING B550-PRO", "BIOS Version": "2830", "Chipset": "B550" },
+          "Advanced": { "Socket": "AM4", "Memory Max": "128 GB", "M.2 Slots": "2" }
+        }},
+      { id: "network", label: "Network", icon: "network", status: "green", sub: "Ethernet",
+        fields: {
+          "Overview": { "Adapter": "Realtek PCIe GbE", "Connection": "Wired", "Current Speed": "1000 Mbps" },
+          "Advanced": { "IP Address": "192.168.1.42", "MAC Address": "3C:E1:A1:xx:xx:xx" }
+        }},
+      { id: "os", label: "OS", icon: "os", status: "yellow", sub: "Windows 11",
+        fields: {
+          "Overview": { "OS": "Windows 11 Pro", "Build": "26100", "Install Date": "2025-11-02" },
+          "Advanced": { "Uptime": "3d 4h", "Activation": "Activated", "Restart Pending": "Yes" }
+        }}
+    ];
+
+    const statusColor = { green: "var(--green)", yellow: "var(--yellow)", red: "var(--red)" };
+    const statusText = { green: "Confirmed good", yellow: "Worth checking", red: "Needs attention" };
+
+    const nodesEl = document.getElementById("nodes");
+    const svgEl = document.getElementById("strandsSvg");
+    const stageEl = document.getElementById("stage");
+    const constellationEl = document.getElementById("constellation");
+    const detailEl = document.getElementById("detail");
+
+    const R = 230, CX = 280, CY = 280;
+    components.forEach((c, i) => {
+      const angle = (i / components.length) * Math.PI * 2 - Math.PI / 2;
+      c.x = CX + R * Math.cos(angle);
+      c.y = CY + R * Math.sin(angle);
+    });
+
+    // Draw curved strand connectors, hub -> node, alternating curve direction like a
+    // double-helix cross-tie rather than straight spokes.
+    components.forEach((c, i) => {
+      const midX = (CX + c.x) / 2 + (i % 2 === 0 ? 18 : -18);
+      const midY = (CY + c.y) / 2 + (i % 2 === 0 ? -18 : 18);
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", `M ${CX} ${CY} Q ${midX} ${midY} ${c.x} ${c.y}`);
+      path.setAttribute("class", "strand-path");
+      path.setAttribute("stroke", i % 2 === 0 ? "var(--gold)" : "var(--strand)");
+      svgEl.appendChild(path);
+    });
+
+    components.forEach(c => {
+      const node = document.createElement("div");
+      node.className = "node";
+      node.style.left = c.x + "px";
+      node.style.top = c.y + "px";
+      node.style.setProperty("--ring", statusColor[c.status]);
+      node.innerHTML = `
+        <div class="node-ring"></div>
+        <div class="node-glyph">${ICONS[c.icon]}</div>
+        <div class="node-label">${c.label}</div>
+        <div class="node-sub">${c.sub}</div>
+      `;
+      node.addEventListener("click", () => expand(c));
+      nodesEl.appendChild(node);
+    });
+
+    function expand(c) {
+      stageEl.classList.add("expanded");
+      constellationEl.classList.add("collapsed");
+      renderDetail(c);
+    }
+
+    function collapse() {
+      stageEl.classList.remove("expanded");
+      constellationEl.classList.remove("collapsed");
+    }
+
+    function renderDetail(c) {
+      let sectionsHtml = "";
+      for (const [section, fields] of Object.entries(c.fields)) {
+        sectionsHtml += `<div class="field-section-title">${section}</div><div class="field-grid">`;
+        for (const [label, value] of Object.entries(fields)) {
+          sectionsHtml += `<div class="field-card"><div class="field-card-label">${label}</div><div class="field-card-value">${value}</div></div>`;
+        }
+        sectionsHtml += `</div>`;
+      }
+
+      detailEl.style.setProperty("--ring", statusColor[c.status]);
+      detailEl.innerHTML = `
+        <button class="back-link" onclick="collapse()">&larr; Back to overview</button>
+        <div class="detail-header">
+          <div class="detail-icon" style="border-color:${statusColor[c.status]}">${ICONS[c.icon]}</div>
+          <div>
+            <div class="detail-title">${c.label}</div>
+            <div class="detail-sub">${c.sub}</div>
+          </div>
+        </div>
+        <div class="status-banner" style="border-left-color:${statusColor[c.status]}">
+          <strong>${statusText[c.status]}</strong>&nbsp;— all fields shown below, no Basic/Advanced split.
+        </div>
+        ${sectionsHtml}
+      `;
+    }
+  </script>
+</body>

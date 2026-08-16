@@ -1,0 +1,23 @@
+<UserControl x:Class="DeviceDNA.UI.HelixVisual"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d">
+
+    <!--
+        Animated vertical DNA double-helix, drawn to reflect Logo.png's helix artwork (rainbow
+        gradient strands, ladder rungs, small circuit-node dots) but as one continuous vertical
+        strand top-to-bottom rather than the logo's horizontal crossed-bowtie shape — shown only on
+        the orbital dashboard's detail-panel left column (BACKLOG.md "DNA-helix / orbital visual
+        redesign"), never on the main orbit overview.
+
+        All geometry is computed parametrically in HelixVisual.xaml.cs from sine curves (not
+        hand-authored static path data) — this is what makes the continuous rotation animation
+        possible: each animation tick re-renders the strands with a phase offset, which is the
+        standard 2D technique for a convincing "spinning helix" look without real 3D rendering.
+    -->
+    <Grid x:Name="RootGrid" ClipToBounds="True" SizeChanged="RootGrid_SizeChanged">
+        <Canvas x:Name="HelixCanvas"/>
+    </Grid>
+</UserControl>

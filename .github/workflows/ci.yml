@@ -1,0 +1,143 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    name: Build, test, vulnerability scan
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore DeviceDNA.sln
+
+      - name: Build
+        run: dotnet build DeviceDNA.sln -c Release --no-restore
+
+      - name: Test
+        run: dotnet test src/DeviceDNA.Tests/DeviceDNA.Tests.csproj -c Release --no-build --logger "trx;LogFileName=test-results.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: src/DeviceDNA.Tests/TestResults/test-results.trx
+
+      - name: NuGet vulnerability scan
+        # dotnet list package --vulnerable does not exit non-zero on findings, so the job fails the
+        # build itself on a match rather than relying on the command's own exit code — a known
+        # vulnerable dependency should block CI, not just print a warning nobody reads.
+        shell: pwsh
+        run: |
+          $output = dotnet list DeviceDNA.sln package --vulnerable --include-transitive 2>&1 | Out-String
+          Write-Host $output
+          if ($output -match ">\s*.+\s+has the following vulnerable packages") {
+            Write-Host "::error::Vulnerable NuGet package(s) detected."
+            exit 1
+          }
+
+  package-smoke-test:
+    name: Installer package smoke test
+    runs-on: windows-latest
+    needs: build-and-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install WiX Toolset v6
+        run: dotnet tool install --global wix --version 6.0.1
+
+      - name: Publish self-contained win-x64 build
+        run: >
+          dotnet publish src/DeviceDNA.UI/DeviceDNA.UI.csproj
+          -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=true
+          -o publish/win-x64
+
+      - name: Build .msi installer
+        run: >
+          dotnet build installer/DeviceDNA.Installer.wixproj
+          -c Release
+          -p:PublishDir="${{ github.workspace }}\publish\win-x64"
+          -p:IconFile="${{ github.workspace }}\assets\icon.ico"
+
+      - name: Install .msi silently
+        shell: pwsh
+        run: |
+          $msi = "installer\bin\x64\Release\DeviceDNA-Setup.msi"
+          $log = "install.log"
+          $proc = Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /quiet /norestart /l*v `"$log`"" -Wait -PassThru
+          Get-Content $log -ErrorAction SilentlyContinue | Select-Object -Last 60
+          if ($proc.ExitCode -ne 0) {
+            Write-Host "::error::msiexec install failed with exit code $($proc.ExitCode)."
+            exit 1
+          }
+
+      - name: Verify install artifacts exist
+        shell: pwsh
+        run: |
+          $exePath = "$env:ProgramFiles\DeviceDNA\DeviceDNA.UI.exe"
+          $shortcutPath = "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\DeviceDNA.lnk"
+          if (-not (Test-Path $exePath)) {
+            Write-Host "::error::Installed exe not found at $exePath"
+            exit 1
+          }
+          if (-not (Test-Path $shortcutPath)) {
+            Write-Host "::error::Start Menu shortcut not found at $shortcutPath"
+            exit 1
+          }
+
+      - name: Launch installed app and verify it doesn't crash
+        # Runs non-elevated on the hosted runner: real hardware sensor access (CPU temp, PawnIO)
+        # is not available here and is not what this step verifies — it only proves the packaging/
+        # install path produced a launchable executable. Sensor-dependent behavior stays a manual
+        # pre-release check on real hardware, same as documented in CLAUDE.md.
+        shell: pwsh
+        run: |
+          $exePath = "$env:ProgramFiles\DeviceDNA\DeviceDNA.UI.exe"
+          $proc = Start-Process -FilePath $exePath -PassThru
+          Start-Sleep -Seconds 8
+          if ($proc.HasExited) {
+            Write-Host "::error::App exited within 8 seconds of launch (exit code $($proc.ExitCode)) — likely a startup crash."
+            exit 1
+          }
+          Stop-Process -Id $proc.Id -Force
+
+      - name: Uninstall .msi silently and verify clean removal
+        shell: pwsh
+        run: |
+          $msi = "installer\bin\x64\Release\DeviceDNA-Setup.msi"
+          $log = "uninstall.log"
+          $proc = Start-Process msiexec.exe -ArgumentList "/x `"$msi`" /quiet /norestart /l*v `"$log`"" -Wait -PassThru
+          Get-Content $log -ErrorAction SilentlyContinue | Select-Object -Last 60
+          if ($proc.ExitCode -ne 0) {
+            Write-Host "::error::msiexec uninstall failed with exit code $($proc.ExitCode)."
+            exit 1
+          }
+          $exePath = "$env:ProgramFiles\DeviceDNA\DeviceDNA.UI.exe"
+          if (Test-Path $exePath) {
+            Write-Host "::error::Install directory still present after uninstall: $exePath"
+            exit 1
+          }
+
+      - name: Upload installer artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DeviceDNA-Setup-msi
+          path: installer/bin/x64/Release/DeviceDNA-Setup.msi
