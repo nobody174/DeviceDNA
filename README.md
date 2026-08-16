@@ -65,6 +65,11 @@ never anything automatic on a routine scan.
 Download the latest `.msi` installer from the [Releases](../../releases) page, run it, and
 launch DeviceDNA from the Start Menu. Windows only for now.
 
+DeviceDNA always asks for administrator access (a UAC prompt) when it launches — this is required
+for full CPU/GPU sensor access (package temperature, live clock speed), which Windows blocks for
+non-elevated apps. If you ever see the app running without that prompt, CPU/GPU temperature and
+live clock will read blank rather than show an incorrect value.
+
 ## Tech stack
 
 C# / .NET 8, WPF. Hardware sensor data via

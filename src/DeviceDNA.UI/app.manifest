@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  DeviceDNA
+  Author:  nobody174 (nobodylearn174@gmail.com)
+  Repo:    https://github.com/nobody174/DeviceDNA
+  Patreon: https://www.patreon.com/c/Nobody174
+  License: All rights reserved (c) 2026 nobody174
+  "It's never too late to give up!"
+
+  requireAdministrator: full CPU/GPU sensor access (package temperature, live clock speed) via
+  LibreHardwareMonitorLib genuinely requires elevation on this hardware — confirmed directly (not
+  assumed) via CHANGELOG.md's "CPU sensor fix" investigation and re-confirmed by a real elevation
+  failure (MSI error 1925) hit while testing this installer. Without this manifest the app launches
+  asInvoker, and a non-elevated launch silently reads 0 for those two fields (RulesEngine's
+  HasPlausibleTemp() guard then hides them rather than showing a wrong "0" value) with no on-screen
+  explanation of why. requireAdministrator makes Windows show the UAC prompt automatically on every
+  launch instead, so every real user gets full sensor data without needing to discover and manually
+  use "Run as Administrator" themselves.
+-->
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+    <security>
+      <requestedPrivileges>
+        <requestedExecutionLevel level="requireAdministrator" uiAccess="false" />
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+</assembly>
+
+<!--*Built with assistance from __Claude Code__ by Anthropic.*-->
